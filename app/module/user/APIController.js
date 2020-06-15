@@ -303,32 +303,4 @@ APIController.uploadPicture = (req, res)=>{
   console.log('File details:: ', req.file);
 }
 
-APIController.checkQuery = (req, res)=>{
-  let data = req.body;
-  console.log('Passed Data:: ', data);
-
-  DBClass.select({
-    modal: data.modal,
-    condition: {
-      email: data.email
-    }
-  }, (err, result)=>{
-    if(!err){
-      console.log('Inside the if Block:: ', err);
-      console.log('Result:: ', result);
-      res.status(200).json({
-        status: 'Success',
-        data: result
-      });
-    } else {
-      console.log('Error:: ', err);
-      res.status(200).json({
-        status: 'failed',
-        error: err
-      });
-    }
-  });
-
-}
-
 module.exports = APIController;

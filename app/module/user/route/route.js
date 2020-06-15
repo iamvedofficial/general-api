@@ -57,8 +57,6 @@ app.put("/update-details",authenticateToken, upload, APIController.updateUserDet
 
 app.post("/uploadpicture", authenticateToken, upload, APIController.uploadPicture);
 
-app.post('/check-query', authenticateToken, APIController.checkQuery);
-
 function generateAccessToken(user) {
   return jwt.sign(user, config.ACCESS_TOKEN_SECRET, { expiresIn: "30m" });
 }
