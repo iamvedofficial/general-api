@@ -13,7 +13,7 @@ const registerSchema = Joi.object({
 });
 
 const editSchema = Joi.object({
-  id: Joi.string().required(),
+  id: Joi.string().optional(),
   username: Joi.string().alphanum().min(3).max(30).optional(),
 
   password: Joi.string().pattern(new RegExp("^[a-zA-Z0-9]{3,30}$")).optional(),
@@ -32,11 +32,13 @@ const editSchema = Joi.object({
     .optional(),
   url: Joi.string().optional(),
   location: Joi.string().min(2).optional(),
-  picture: Joi.string().optional()
+  picture: Joi.string().optional(),
+  token: Joi.string().required()
 });
 
 const removeSchema = Joi.object({
-  id: Joi.string().required()
+  id: Joi.string().required(),
+  token: Joi.string().required()
 });
 
 const loginSchema = Joi.object({
@@ -44,7 +46,7 @@ const loginSchema = Joi.object({
     minDomainSegments: 2,
     tlds: { allow: ["com", "net"] },
   }).required(),
-  password: Joi.string().required()
+  password: Joi.string().required(),
 });
 
 module.exports = {

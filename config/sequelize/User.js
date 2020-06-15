@@ -18,6 +18,9 @@ var modelDefinition = {
         type: Sequelize.STRING,
         allowNull: false,
     },
+    user_type: {
+        type: Sequelize.STRING
+    },
     mobile: {
         type: Sequelize.STRING,
         unique: true,

@@ -6,8 +6,8 @@ const multer = require('multer');
 const path = require('path');
 
 const db = require("../../../../config/sequelize/database");
-const APIController = require("../APIController");
-const DbClass = require("../model/dbQuery");
+const APIController = require("../UserController");
+const DbClass = require("../model/UserModel");
 const config = require("../../../../config/config");
 
 app.use((req, res, next) => {
@@ -45,17 +45,19 @@ app.post("/get-Token", (req, res) => {
   res.json({ accessToken: accessToken });
 });
 
-app.post("/register", authenticateToken, APIController.register);
+app.post("/register", upload, APIController.register);
 
 app.post('/user-login', APIController.userLogin);
 
 app.put("/addBusiness", authenticateToken, APIController.addBusiness);
 
-app.delete("/remove-user", authenticateToken, APIController.removeUser);
+app.delete("/remove-user", APIController.removeUser);
 
-app.put("/update-details",authenticateToken, upload, APIController.updateUserDetails);
+app.put("/update-details", upload, APIController.updateUserDetails);
 
-app.post("/uploadpicture", authenticateToken, upload, APIController.uploadPicture);
+app.post("/uploadpicture", upload, APIController.uploadPicture);
+
+app.post('/check-query', authenticateToken, APIController.checkQuery);
 
 function generateAccessToken(user) {
   return jwt.sign(user, config.ACCESS_TOKEN_SECRET, { expiresIn: "30m" });
