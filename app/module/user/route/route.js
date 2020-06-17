@@ -55,9 +55,7 @@ app.delete("/remove-user", APIController.removeUser);
 
 app.put("/update-details", upload, APIController.updateUserDetails);
 
-app.post("/uploadpicture", upload, APIController.uploadPicture);
-
-app.post('/check-query', authenticateToken, APIController.checkQuery);
+app.post("/logout", APIController.logout);
 
 function generateAccessToken(user) {
   return jwt.sign(user, config.ACCESS_TOKEN_SECRET, { expiresIn: "30m" });

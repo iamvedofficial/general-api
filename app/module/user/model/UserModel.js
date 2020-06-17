@@ -1,6 +1,7 @@
 const sequelize = require("sequelize");
 const db = require("../../../../config/sequelize/database");
 const User = require("../../../../config/sequelize/User");
+const UserLog = require("../../../../config/sequelize/UserLog");
 
 module.exports = {
   insert: (data, callback) => {
@@ -82,4 +83,17 @@ module.exports = {
       });
     });
   },
+
+  addUserLog: (data, callback) => {
+    console.log('inside the add user log');
+    db.sync()
+    .then(() => {
+      return UserLog.create(data.dataToInsert).then(() => {
+        callback(null, { status: "success", msg: "User log added" });
+      });
+    })
+    .catch((error) => {
+      callback(error, { msg: "Some error occured in adding the log" });
+    });
+  }
 };

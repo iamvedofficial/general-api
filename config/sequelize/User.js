@@ -37,6 +37,10 @@ var modelDefinition = {
     picture: {
         type: Sequelize.STRING,
         allowNull: true
+    },
+    token: {
+        type: Sequelize.STRING,
+        allowNull: true
     }
 };
 

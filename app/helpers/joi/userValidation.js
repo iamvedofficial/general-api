@@ -49,9 +49,13 @@ const loginSchema = Joi.object({
   password: Joi.string().required(),
 });
 
+const logoutSchema = Joi.object({
+  token: Joi.string().required()
+})
 module.exports = {
   registerSchema,
   editSchema,
   removeSchema,
-  loginSchema
+  loginSchema,
+  logoutSchema
 };

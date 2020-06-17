@@ -21,6 +21,7 @@ const APIController = {};
  * @return json response
  */
 
+
 APIController.register = (req, res) => {
   function validateData(callback) {
     try {
@@ -42,12 +43,12 @@ APIController.register = (req, res) => {
     DBClass.insert(
       {
         dataToInsert: {
-          username    : data.username,
-          email       : data.email,
-          password    : bcrypt.hashSync(data.password, 10),
-          mobile      : data.mobile,
-          picture     : (req.file !== undefined) ? req.file.path : null
-        }, 
+          username: data.username,
+          email: data.email,
+          password: bcrypt.hashSync(data.password, 10),
+          mobile: data.mobile,
+          picture: req.file !== undefined ? req.file.path : null,
+        },
       },
       (err, result) => {
         if (!err) {
@@ -113,8 +114,8 @@ APIController.addBusiness = (req, res) => {
 /*
  * login user
  *
- * @function   removeUser
- * @param  id
+ * @function   userLogin
+ * @param  id(required), password(required)
  * @return json response
  */
 APIController.userLogin = (req, res) => {
@@ -151,11 +152,18 @@ APIController.userLogin = (req, res) => {
         if (!err) {
           console.log("Inside the if Block:: ", err);
           console.log("Result:: ", result);
-          callback(null, {
-            status: "success",
-            data: data,
-            userDetails: result,
-          });
+          if (result.data.length) {
+            callback(null, {
+              status: "success",
+              data: data,
+              userDetails: result,
+            });
+          } else {
+            callback("email or password is wrong. Please check ", {
+              status: "failed",
+              err: "email or password is wrong. Please check ",
+            });
+          }
         } else {
           console.log("Error:: ", err);
           callback(err, {
@@ -178,22 +186,21 @@ APIController.userLogin = (req, res) => {
       console.log("Wrong password!!!!!!!!!!");
       callback("password is wrong. please try again.", { code: 400 });
     } else {
-
       var tokenData = {
-        email     : userData.userDetails.data[0].email,
-        username  : userData.userDetails.data[0].username,
-        id        : userData.userDetails.data[0].id,
-        user_type : userData.userDetails.data[0].user_type
+        email: userData.userDetails.data[0].email,
+        username: userData.userDetails.data[0].username,
+        id: userData.userDetails.data[0].id,
+        user_type: userData.userDetails.data[0].user_type,
       };
-      
+
       var resultData = {
         token: jwt.sign(tokenData, config.TOKEN_GENERATION, {
-          expiresIn: '60m',
+          expiresIn: "60m",
         }),
         email: userData.userDetails.data[0].email,
         username: userData.userDetails.data[0].username,
         id: userData.userDetails.data[0].id,
-        user_type : userData.userDetails.data[0].user_type
+        user_type: userData.userDetails.data[0].user_type,
       };
       callback(null, {
         userDetails: resultData,
@@ -202,23 +209,68 @@ APIController.userLogin = (req, res) => {
     }
   }
 
-  async.waterfall([loginValidation, checkDB, login], (err, result) => {
-    if (!err) {
-      res.status(200).json({
-        status: "success",
-        data: result,
-      });
-    } else {
-      console.log("Error:: ", err);
-      res.status(200).json({
-        status: "failed",
-        err: err,
-      });
+  function addToken(data, callback) {
+    let values = { token: data.userDetails.token };
+
+    let selector = {
+      where: { id: data.userDetails.id },
+    };
+    DBClass.update(values, selector, (err, result) => {
+      if (!err) {
+        callback(null, { userDetails: data.userDetails });
+      } else {
+        callback(err, { msg: "Error in adding token" });
+      }
+    });
+  }
+
+  function addUserLog(data, callback) {
+    console.log("Add User Log:: ", data);
+    DBClass.addUserLog(
+      {
+        dataToInsert: {
+          user_id: data.userDetails.id,
+          user_type: data.userDetails.user_type,
+          action: "login",
+        },
+      },
+      (err, result) => {
+        if (!err) {
+          callback(null, {
+            userDetails: data.userDetails,
+            msg: "login successful",
+          });
+        } else {
+          callback(err, {
+            err: "error in adding details",
+            err_type: "adding_error",
+          });
+        }
+      }
+    );
+  }
+
+  async.waterfall(
+    [loginValidation, checkDB, login, addToken, addUserLog],
+    (err, result) => {
+      if (!err) {
+        res.status(200).json({
+          status: "success",
+          data: result,
+        });
+      } else {
+        console.log("Error:: ", err);
+        res.status(200).json({
+          status: "failed",
+          err: err,
+        });
+      }
     }
-  });
+  );
 };
 /*
  * Delete user's details from database
+ * only admin can remove any user from data base
  *
  * @function   removeUser
  * @param  id
@@ -242,9 +294,41 @@ APIController.removeUser = (req, res) => {
     }
   }
 
+  function checkToken(data, callback) {
+    console.log('Checking token in Remove user:: ', data);
+    let decode = jwt.verify(data.token, config.TOKEN_GENERATION);
+    console.log("Decoded in remove:: ", decode);
+    DBClass.select(
+      {
+        condition: {
+          token: data.token,
+          id: decode.id,
+        },
+      },
+      (err, result) => {
+        if (!err) {
+          if (result.data.length) {
+            callback(null, data);
+          } else {
+            callback("User not loged in.", {
+              status: "failed",
+              err: "User not loged in.",
+            });
+          }
+        } else {
+          console.log("Error:: ", err);
+          callback(err, {
+            status: "failed",
+            err: err,
+          });
+        }
+      }
+    );
+  }
+
   function removeUser(data, callback) {
     let decoded = jwt.verify(data.token, config.TOKEN_GENERATION);
-    if(decoded.user_type === "A" && data.id !== decoded.id){
+    if (decoded.user_type === "A" && data.id !== decoded.id) {
       DBClass.delete(
         {
           id: data.id,
@@ -258,11 +342,14 @@ APIController.removeUser = (req, res) => {
         }
       );
     } else {
-      callback('Authentication required to do this action.', {msg: "Authentication required", err_msg: 'authentication_required'});
+      callback("Authentication required to do this action.", {
+        msg: "Authentication required",
+        err_msg: "authentication_required",
+      });
     }
   }
 
-  async.waterfall([validateId, removeUser], (err, result) => {
+  async.waterfall([validateId, checkToken, removeUser], (err, result) => {
     if (!err) {
       res.status(200).json(result);
     } else {
@@ -278,13 +365,13 @@ APIController.removeUser = (req, res) => {
 * Edit user's details in database
 * 
 * @function   updateUserDetails
-* @param  id(required), name(optional),mobile(optional),
+* @param  id(required for Admin), name(optional),mobile(optional),
           url(optional), email(optional)
 * @return json response
 */
 APIController.updateUserDetails = (req, res) => {
   function validateEdit(callback) {
-    if(req.body.token){
+    if (req.body.token) {
       try {
         let data = req.body;
         const value = JoiValidation.editSchema.validateAsync(data);
@@ -300,15 +387,51 @@ APIController.updateUserDetails = (req, res) => {
         callback(err, null);
       }
     } else {
-      callback('Token required. Please login and get token.', {err: "Token required. Please login and get token.", err_type: "token_required"});
+      callback("Token required. Please login and get token.", {
+        err: "Token required. Please login and get token.",
+        err_type: "token_required",
+      });
     }
   }
 
+  function checkToken(data, callback) {
+    console.log('Checking token in Remove user:: ', data);
+    let decode = jwt.verify(data.token, config.TOKEN_GENERATION);
+    console.log("Decoded in remove:: ", decode);
+    DBClass.select(
+      {
+        condition: {
+          token: data.token,
+          id: decode.id,
+        },
+      },
+      (err, result) => {
+        if (!err) {
+          if (result.data.length) {
+            callback(null, data);
+          } else {
+            callback("User not loged in.", {
+              status: "failed",
+              err: "User not loged in.",
+            });
+          }
+        } else {
+          console.log("Error:: ", err);
+          callback(err, {
+            status: "failed",
+            err: err,
+          });
+        }
+      }
+    );
+  }
+
   function editUserDetails(passedData, callback) {
+    console.log('Passed Data by admin: ', passedData);
     let values = [];
     let decoded = jwt.verify(req.body.token, config.TOKEN_GENERATION);
-    if(decoded.user_type === "A"){
-      if(passedData.id){
+    if (decoded.user_type === "A") {
+      if (passedData.id) {
         for (let [key, value] of Object.entries(passedData)) {
           if (key != "id") {
             values[key] = value;
@@ -317,13 +440,16 @@ APIController.updateUserDetails = (req, res) => {
         if (req.file !== undefined) {
           values["picture"] = req.file.path;
         } else {
-          callback('Image required, Please add the picture.', {msg: 'Image required, Please add the picture.', err_type: 'image_required'});
+          callback("Image required, Please add the picture.", {
+            msg: "Image required, Please add the picture.",
+            err_type: "image_required",
+          });
         }
-    
+
         let selector = {
           where: { id: passedData.id },
         };
-    
+
         DBClass.update(values, selector, (err, result) => {
           if (!err) {
             callback(null, result);
@@ -332,7 +458,10 @@ APIController.updateUserDetails = (req, res) => {
           }
         });
       } else {
-        callback('Id required do edit the user details by admin.', {msg: 'Admin can\'t edit without user id.', err_type: 'user_id_required'});
+        callback("Id required do edit the user details by admin.", {
+          msg: "Admin can't edit without user id.",
+          err_type: "user_id_required",
+        });
       }
     } else {
       for (let [key, value] of Object.entries(passedData)) {
@@ -343,13 +472,16 @@ APIController.updateUserDetails = (req, res) => {
       if (req.file !== undefined) {
         values["picture"] = req.file.path;
       } else {
-        callback('Image required, Please add the picture.', {msg: 'Image required, Please add the picture.', err_type: 'image_required'});
+        callback("Image required, Please add the picture.", {
+          msg: "Image required, Please add the picture.",
+          err_type: "image_required",
+        });
       }
-  
+
       let selector = {
         where: { id: decoded.id },
       };
-  
+
       DBClass.update(values, selector, (err, result) => {
         if (!err) {
           callback(null, result);
@@ -360,7 +492,7 @@ APIController.updateUserDetails = (req, res) => {
     }
   }
 
-  async.waterfall([validateEdit, editUserDetails], (err, result) => {
+  async.waterfall([validateEdit, checkToken, editUserDetails], (err, result) => {
     if (!err) {
       res.status(200).json({
         status: "success",
@@ -375,39 +507,87 @@ APIController.updateUserDetails = (req, res) => {
   });
 };
 
-APIController.uploadPicture = (req, res) => {
-  console.log("Data passed From :: ", req.body);
-  console.log("File details:: ", req.file);
-};
 
-APIController.checkQuery = (req, res) => {
-  let data = req.body;
-  console.log("Passed Data:: ", data);
 
-  DBClass.select(
-    {
-      modal: data.modal,
-      condition: {
-        email: data.email,
-      },
-    },
-    (err, result) => {
-      if (!err) {
-        console.log("Inside the if Block:: ", err);
-        console.log("Result:: ", result);
-        res.status(200).json({
-          status: "Success",
-          data: result,
+/*
+* Logout user, logout disable the token for the further works
+* 
+* @function   logout
+* @param  token(required)
+* @return json response
+*/
+APIController.logout = (req, res) => {
+  function validateData(callback) {
+    try {
+      let data = req.body;
+      console.log("inside the Logut validation:: ", data);
+      const value = JoiValidation.logoutSchema.validateAsync(data);
+      value
+        .then((checkValidation) => {
+          callback(null, data);
+        })
+        .catch((err) => {
+          console.log("Error:: ", err);
+          callback(err.details[0].message, null);
         });
-      } else {
-        console.log("Error:: ", err);
-        res.status(200).json({
-          status: "failed",
-          error: err,
-        });
-      }
+    } catch (err) {
+      callback(err, null);
     }
-  );
+  }
+
+  function logoutUser(data, callback) {
+    let decoded = jwt.verify(data.token, config.TOKEN_GENERATION);
+    console.log("decoded Object :: ", decoded);
+    let values = { token: null };
+    let selector = {
+      where: { id: decoded.id },
+    };
+    DBClass.update(values, selector, (err, result) => {
+      if (!err) {
+        callback(null, { data: decoded });
+      } else {
+        callback(err, { msg: "Error in updating token" });
+      }
+    });
+  }
+
+  function addUserLog(userData, callback) {
+    console.log("Add User Log in logout:: ", userData);
+    DBClass.addUserLog(
+      {
+        dataToInsert: {
+          user_id: userData.data.id,
+          user_type: userData.data.user_type,
+          action: "logout",
+        },
+      },
+      (err, result) => {
+        if (!err) {
+          callback(null, { msg: "logout successfully" });
+        } else {
+          callback(err, {
+            err: "error in adding details",
+            err_type: "adding_error",
+          });
+        }
+      }
+    );
+  }
+
+  async.waterfall([validateData, logoutUser, addUserLog], (err, result) => {
+    if (!err) {
+      res.status(200).json({
+        status: "success",
+        msg: "user logout successfully",
+      });
+    } else {
+      res.json({
+        status: "failed",
+        msg: err,
+      });
+    }
+  });
 };
+
 
 module.exports = APIController;
