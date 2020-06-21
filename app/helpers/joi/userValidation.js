@@ -33,7 +33,8 @@ const editSchema = Joi.object({
   url: Joi.string().optional(),
   location: Joi.string().min(2).optional(),
   picture: Joi.string().optional(),
-  token: Joi.string().required()
+  token: Joi.string().required(),
+  oldPhotoPath: Joi.string().required()
 });
 
 const removeSchema = Joi.object({

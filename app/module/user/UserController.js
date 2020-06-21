@@ -3,6 +3,7 @@ const async = require("async");
 const multer = require("multer");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const fs = require("fs");
 
 const db = require("../../../config/sequelize/database");
 const User = require("../../../config/sequelize/User");
@@ -10,6 +11,7 @@ const JoiValidation = require("../../helpers/joi/userValidation");
 const DBClass = require("./model/UserModel");
 const userHelper = require("../../helpers/UserHelper/userHelpers");
 const config = require("../../../config/config");
+const Helpers = require("../../helpers/UserHelper/userHelpers");
 
 // The authentication controller.
 const APIController = {};
@@ -20,7 +22,6 @@ const APIController = {};
  * @param  username, email, mobile, password
  * @return json response
  */
-
 
 APIController.register = (req, res) => {
   function validateData(callback) {
@@ -259,7 +260,7 @@ APIController.userLogin = (req, res) => {
           data: result,
         });
       } else {
-        console.log("Error:: ", err);
+        console.log("Error[]:: ", err);
         res.status(200).json({
           status: "failed",
           err: err,
@@ -295,7 +296,7 @@ APIController.removeUser = (req, res) => {
   }
 
   function checkToken(data, callback) {
-    console.log('Checking token in Remove user:: ', data);
+    console.log("Checking token in Remove user:: ", data);
     let decode = jwt.verify(data.token, config.TOKEN_GENERATION);
     console.log("Decoded in remove:: ", decode);
     DBClass.select(
@@ -324,6 +325,30 @@ APIController.removeUser = (req, res) => {
         }
       }
     );
+  }
+
+  function removeUserLogs(data, callback){
+    let decoded = jwt.verify(data.token, config.TOKEN_GENERATION);
+    if (decoded.user_type === "A") {
+      DBClass.removeUserLog(
+        {
+          id: data.id,
+        },
+        (err, result) => {
+          if (!err) {
+            console.log('Inside the remove user log:: ', result);
+            callback(null, data);
+          } else {
+            callback(err, result);
+          }
+        }
+      );
+    } else {
+      callback("Authentication required to do this action.", {
+        msg: "Authentication required",
+        err_msg: "authentication_required",
+      });
+    }
   }
 
   function removeUser(data, callback) {
@@ -349,7 +374,7 @@ APIController.removeUser = (req, res) => {
     }
   }
 
-  async.waterfall([validateId, checkToken, removeUser], (err, result) => {
+  async.waterfall([validateId, checkToken, removeUserLogs, removeUser], (err, result) => {
     if (!err) {
       res.status(200).json(result);
     } else {
@@ -369,7 +394,7 @@ APIController.removeUser = (req, res) => {
           url(optional), email(optional)
 * @return json response
 */
-APIController.updateUserDetails = (req, res) => {
+APIController.updateUserDetails_backup = (req, res) => {
   function validateEdit(callback) {
     if (req.body.token) {
       try {
@@ -395,7 +420,7 @@ APIController.updateUserDetails = (req, res) => {
   }
 
   function checkToken(data, callback) {
-    console.log('Checking token in Remove user:: ', data);
+    console.log("Checking token in Remove user:: ", data);
     let decode = jwt.verify(data.token, config.TOKEN_GENERATION);
     console.log("Decoded in remove:: ", decode);
     DBClass.select(
@@ -426,43 +451,72 @@ APIController.updateUserDetails = (req, res) => {
     );
   }
 
+  function deletePhoto(data, callback) {
+    console.log("Inside the delete Photo:: ", data);
+    if (req.file !== undefined) {
+      let decoded = jwt.verify(req.body.token, config.TOKEN_GENERATION);
+
+      if (decoded.user_type === "A") {
+        DBClass.select(
+          {
+            condition: {
+              id: data.id ? data.id : decoded.id,
+            },
+          },
+          (err, result) => {
+            if (!err) {
+              if (result.data.length) {
+                console.log("Selected Data[deleting old photo]:: ", result);
+                callback(null, { userData: res });
+              } else {
+                callback("Id not found.", {
+                  status: "failed",
+                  err: "Id not found. ",
+                });
+              }
+            } else {
+              console.log("Error:: ", err);
+              callback(err, {
+                status: "failed",
+                err: err,
+              });
+            }
+          }
+        );
+      }
+    }
+  }
+
   function editUserDetails(passedData, callback) {
-    console.log('Passed Data by admin: ', passedData);
+    console.log("Passed Data by admin: ", passedData);
     let values = [];
     let decoded = jwt.verify(req.body.token, config.TOKEN_GENERATION);
     if (decoded.user_type === "A") {
-      if (passedData.id) {
-        for (let [key, value] of Object.entries(passedData)) {
-          if (key != "id") {
-            values[key] = value;
-          }
+      for (let [key, value] of Object.entries(passedData)) {
+        if (key != "id") {
+          values[key] = value;
         }
-        if (req.file !== undefined) {
-          values["picture"] = req.file.path;
-        } else {
-          callback("Image required, Please add the picture.", {
-            msg: "Image required, Please add the picture.",
-            err_type: "image_required",
-          });
-        }
-
-        let selector = {
-          where: { id: passedData.id },
-        };
-
-        DBClass.update(values, selector, (err, result) => {
-          if (!err) {
-            callback(null, result);
-          } else {
-            callback(err, result);
-          }
-        });
+      }
+      if (req.file !== undefined) {
+        values["picture"] = req.file.path;
       } else {
-        callback("Id required do edit the user details by admin.", {
-          msg: "Admin can't edit without user id.",
-          err_type: "user_id_required",
+        callback("Image required, Please add the picture.", {
+          msg: "Image required, Please add the picture.",
+          err_type: "image_required",
         });
       }
+
+      let selector = {
+        where: { id: passedData.id },
+      };
+
+      DBClass.update(values, selector, (err, result) => {
+        if (!err) {
+          callback(null, result);
+        } else {
+          callback(err, result);
+        }
+      });
     } else {
       for (let [key, value] of Object.entries(passedData)) {
         if (key != "id") {
@@ -486,36 +540,259 @@ APIController.updateUserDetails = (req, res) => {
         if (!err) {
           callback(null, result);
         } else {
-          callback(err, result);
+          callback(err.errors[0].message, result);
         }
       });
     }
   }
 
-  async.waterfall([validateEdit, checkToken, editUserDetails], (err, result) => {
-    if (!err) {
-      res.status(200).json({
-        status: "success",
-        msg: " user data modified succesfully.",
-      });
-    } else {
-      res.json({
-        status: "failed",
-        err: err,
-      });
+  async.waterfall(
+    [validateEdit, checkToken, deletePhoto, editUserDetails],
+    (err, result) => {
+      if (!err) {
+        res.status(200).json({
+          status: "success",
+          msg: " user data modified succesfully.",
+        });
+      } else {
+        res.json({
+          status: "failed",
+          err: err,
+        });
+      }
     }
-  });
+  );
 };
 
+APIController.updateUserDetails = (req, res) => {
+  function validateEdit(callback) {
+    if (req.body.token) {
+      try {
+        let data = req.body;
+        const value = JoiValidation.editSchema.validateAsync(data);
+        value
+          .then((checkValidation) => {
+            callback(null, data);
+          })
+          .catch((err) => {
+            console.log("Error:: ", err);
+            callback(err.details[0].message, null);
+          });
+      } catch (err) {
+        callback(err, null);
+      }
+    } else {
+      callback("Token required. Please login and get token.", {
+        err: "Token required. Please login and get token.",
+        err_type: "token_required",
+      });
+    }
+  }
 
+
+  function checkToken(data, callback) {
+    let decode = jwt.verify(data.token, config.TOKEN_GENERATION);
+    DBClass.select(
+      {
+        condition: {
+          token: data.token,
+          id: decode.id,
+        },
+      },
+      (err, result) => {
+        if (!err) {
+          if (result.data.length) {
+            console.log('Inside the checking token result in Edit profile:: ', result);
+            callback(null, data);
+          } else {
+            callback("User not loged in.", {
+              status: "failed",
+              err: "User not loged in.",
+            });
+          }
+        } else {
+          console.log("Error:: ", err);
+          callback(err, {
+            status: "failed",
+            err: err,
+          });
+        }
+      }
+    );
+  }
+
+  function isAdmin(data, callback) {
+    if(data.id){
+      DBClass.select(
+        {
+          condition: {
+            id: data.id,
+          },
+        },
+        (err, result) => {
+          if (!err) {
+            if (result.data.length) {
+              console.log('Inside the checking is Admin:: ', result.data[0].dataValues.username);
+              if(result.data[0].dataValues.user_type === "A"){
+                callback("Can't change Admin data", {status: "failed", msg: "not autorize to do the change"});
+              } else{
+                callback(null, data);
+              }
+            } else {
+              callback("User not found.", {
+                status: "failed",
+                err: "User not found.",
+              });
+            }
+          } else {
+            console.log("Error:: ", err);
+            callback(err, {
+              status: "failed",
+              err: err,
+            });
+          }
+        }
+      );
+    } else {
+      callback(null, data);
+    }
+  }
+
+  function editUserDetails(passedData, callback) {
+    console.log("Passed Data by admin: ", passedData);
+    try {
+      if (fs.existsSync(passedData.oldPhotoPath)) {
+        //file exists
+        let values = [];
+        let decoded = jwt.verify(req.body.token, config.TOKEN_GENERATION);
+        if (decoded.user_type === "A") {
+          for (let [key, value] of Object.entries(passedData)) {
+            if (key != "id") {
+              values[key] = value;
+            }
+          }
+          if (req.file !== undefined) {
+            values["picture"] = req.file.path;
+          } else {
+            callback("Image required, Please add the picture.", {
+              msg: "Image required, Please add the picture.",
+              err_type: "image_required",
+            });
+          }
+
+          let selector = {
+            where: { id: passedData.id ? passedData.id : decoded.id },
+          };
+
+          DBClass.update(values, selector, (err, result) => {
+            if (!err) {
+              Helpers.deleteFileFromTheFolder(
+                {
+                  path: passedData.oldPhotoPath,
+                },
+                (err, result) => {
+                  if (!err && result.status === "success") {
+                    callback(null, result);
+                  } else {
+                    callback("Error in deleteing the file", {
+                      status: "failed",
+                    });
+                  }
+                }
+              );
+            } else {
+              console.log(
+                "Error inside the update query:: ",
+                err.errors[0].message
+              );
+              callback(err.errors[0].message, result);
+            }
+          });
+        } else {
+          for (let [key, value] of Object.entries(passedData)) {
+            if (key != "id") {
+              values[key] = value;
+            }
+          }
+          if (req.file !== undefined) {
+            values["picture"] = req.file.path;
+          } else {
+            callback("Image required, Please add the picture.", {
+              msg: "Image required, Please add the picture.",
+              err_type: "image_required",
+            });
+          }
+
+          let selector = {
+            where: { id: decoded.id },
+          };
+
+          DBClass.update(values, selector, (err, result) => {
+            if (!err) {
+              Helpers.deleteFileFromTheFolder(
+                {
+                  path: passedData.oldPhotoPath,
+                },
+                (err, response) => {
+                  if (!err && response.status === "success") {
+                    callback(null, result);
+                  } else {
+                    callback("Error in deleteing the file", {
+                      status: "failed",
+                    });
+                  }
+                }
+              );
+              // callback(null, result);
+            } else {
+              callback(err, result);
+            }
+          });
+        }
+      } else {
+        Helpers.deleteFileFromTheFolder(
+          {
+            path: req.file.path
+          },
+          (err, result) => {
+            callback("Old Photo path is not valid", {
+              status: "failed",
+              msg: "image path mot find",
+            });
+          }
+        );
+      }
+    } catch (err) {
+      console.error(err);
+      callback(err, null);
+    }
+  }
+
+  async.waterfall(
+    [validateEdit, checkToken, isAdmin, editUserDetails],
+    (err, result) => {
+      if (!err) {
+        res.status(200).json({
+          status: "success",
+          msg: " user data modified succesfully.",
+        });
+      } else {
+        res.json({
+          status: "failed",
+          err: err,
+        });
+      }
+    }
+  );
+};
 
 /*
-* Logout user, logout disable the token for the further works
-* 
-* @function   logout
-* @param  token(required)
-* @return json response
-*/
+ * Logout user, logout disable the token for the further works
+ *
+ * @function   logout
+ * @param  token(required)
+ * @return json response
+ */
 APIController.logout = (req, res) => {
   function validateData(callback) {
     try {
@@ -589,5 +866,37 @@ APIController.logout = (req, res) => {
   });
 };
 
+APIController.checkDeleteFile = (req, res) => {
+  console.log("Isnide the cehck delete file");
+  let data = req.body;
+  try {
+    if (fs.existsSync(data.path)) {
+      //file exists
+      Helpers.deleteFileFromTheFolder(
+        {
+          path: data.path,
+        },
+        (err, result) => {
+          if (!err && result.status) {
+            res.status(200).json({
+              status: 200,
+              msg: "file has been deleted",
+            });
+          } else {
+            res.status(200).json({
+              status: "failed",
+              err: err,
+            });
+          }
+        }
+      );
+    } else {
+      console.log("Path is not valid");
+      res.json({ status: "failed", msg: "path is not valid" });
+    }
+  } catch (err) {
+    console.error(err);
+  }
+};
 
 module.exports = APIController;

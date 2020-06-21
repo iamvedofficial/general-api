@@ -95,5 +95,33 @@ module.exports = {
     .catch((error) => {
       callback(error, { msg: "Some error occured in adding the log" });
     });
+  },
+
+  removeUserLog: (userId, cb) => {
+    UserLog.destroy({
+      where: {
+        user_id: userId.id,
+      },
+    })
+      .then((check) => {
+        if (check) {
+          cb(null, {
+            status: "success",
+            rowDeleted: check,
+            msg: "User logs deleted",
+          });
+        } else {
+          cb("Id not found", {
+            status: "failed",
+            msg: "Id not found",
+          });
+        }
+      })
+      .catch((err) => {
+        cb(err, {
+          status: "failed",
+          message: err,
+        });
+      });
   }
 };

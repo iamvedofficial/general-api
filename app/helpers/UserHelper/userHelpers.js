@@ -1,18 +1,22 @@
 const crypto = require('crypto');
+const fs = require('fs');
 const config = require('../../helpers/UserHelper/userHelpers');
 
 module.exports = {
-    encrypt: function (text) {
-        var cipher = crypto.createCipher('aes-256-ctr', config.ENC_DEC_PWD)
-        var crypted = cipher.update(text, 'utf8', 'hex')
-        crypted += cipher.final('hex');
-        return crypted;
-    },
-    decrypt: function (text) {
-        var decipher = crypto.createDecipher('aes-256-ctr', config.ENC_DEC_PWD)
-        var dec = decipher.update(text, 'hex', 'utf8')
-        dec += decipher.final('utf8');
-        return dec;
+    deleteFileFromTheFolder:  (data, callback)=>{
+    
+        if(data.path){
+            if(fs.existsSync(data.path)){
+                fs.unlink(data.path, (err)=>{
+                    if(err){
+                        callback(err, {status: 'failed', msg: 'Error occured in the deleting the file.'});
+                    } else {
+                        callback(null, {status: 'success', msg: 'File has been deleted.'});
+                    }
+                });
+            } else {
+                callback('Filename does not exists or invalid filename', {status: 'failed', msg: 'Filename does not exists or invalid filename'});
+            }
+        }
     }
-
 }

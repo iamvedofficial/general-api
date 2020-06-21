@@ -5,6 +5,7 @@ const jwt = require("jsonwebtoken");
 const multer = require('multer');
 const path = require('path');
 
+
 const db = require("../../../../config/sequelize/database");
 const APIController = require("../UserController");
 const DbClass = require("../model/UserModel");
@@ -56,6 +57,8 @@ app.delete("/remove-user", APIController.removeUser);
 app.put("/update-details", upload, APIController.updateUserDetails);
 
 app.post("/logout", APIController.logout);
+
+app.post("/delete/file", APIController.checkDeleteFile);
 
 function generateAccessToken(user) {
   return jwt.sign(user, config.ACCESS_TOKEN_SECRET, { expiresIn: "30m" });
