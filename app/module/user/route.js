@@ -6,10 +6,10 @@ const multer = require('multer');
 const path = require('path');
 
 
-const db = require("../../../../config/sequelize/database");
-const APIController = require("../UserController");
-const DbClass = require("../model/UserModel");
-const config = require("../../../../config/config");
+const db = require("../../../config/sequelize/database");
+const APIController = require("./UserController");
+const DbClass = require("./UserModel");
+const config = require("../../../config/config");
 
 app.use((req, res, next) => {
   // .. some logic here .. like any other middleware
