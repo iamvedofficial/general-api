@@ -17,7 +17,7 @@ app.use((req, res, next) => {
 });
 let storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    if (file.mimetype == 'image/jpeg') {
+    if (file.mimetype == 'image/jpeg' || file.mimetype == 'image/png') {
       cb(null, path.join(path.dirname(require.main.filename), 'public/upload/images'))
     } else {
       cb('File type not allowed', null);
