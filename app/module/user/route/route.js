@@ -33,9 +33,6 @@ let upload = multer({
   storage: storage
 }).single('imagePost');
 
-app.get("/check", (req, res) => {
-  res.send("Working good GO get it");
-});
 
 app.post("/get-Token", (req, res) => {
   // Authenticate User
@@ -57,8 +54,6 @@ app.delete("/remove-user", APIController.removeUser);
 app.put("/update-details", upload, APIController.updateUserDetails);
 
 app.post("/logout", APIController.logout);
-
-app.post("/delete/file", APIController.checkDeleteFile);
 
 function generateAccessToken(user) {
   return jwt.sign(user, config.ACCESS_TOKEN_SECRET, { expiresIn: "30m" });

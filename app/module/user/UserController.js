@@ -706,37 +706,4 @@ APIController.logout = (req, res) => {
   });
 };
 
-APIController.checkDeleteFile = (req, res) => {
-  console.log("Isnide the cehck delete file");
-  let data = req.body;
-  try {
-    if (fs.existsSync(data.path)) {
-      //file exists
-      Helpers.deleteFileFromTheFolder(
-        {
-          path: data.path,
-        },
-        (err, result) => {
-          if (!err && result.status) {
-            res.status(200).json({
-              status: 200,
-              msg: "file has been deleted",
-            });
-          } else {
-            res.status(200).json({
-              status: "failed",
-              err: err,
-            });
-          }
-        }
-      );
-    } else {
-      console.log("Path is not valid");
-      res.json({ status: "failed", msg: "path is not valid" });
-    }
-  } catch (err) {
-    console.error(err);
-  }
-};
-
 module.exports = APIController;
