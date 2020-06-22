@@ -1,6 +1,6 @@
-const sequelize = require("sequelize");
-const db = require("../../../../config/sequelize/database");
-const User = require("../../../../config/sequelize/User");
+const db = require("../../../config/sequelize/database");
+const User = require("../../../config/sequelize/User");
+const UserLog = require("../../../config/sequelize/UserLog");
 
 module.exports = {
   insert: (data, callback) => {
@@ -62,14 +62,12 @@ module.exports = {
   },
 
   select: (data, cb) => {
-    console.log('Inside the select querr:: ',data.modal);
     User.findAll({
       where: data.condition,
       order: [["createdAt", "DESC"]],
     }).then(function (entries) {
       //only difference is that you get users list limited to 1
       //entries[0]
-      console.log('Data selected :: ', entries);
       cb(null, {
         status: "success",
         data: entries,
@@ -82,4 +80,44 @@ module.exports = {
       });
     });
   },
+
+  addUserLog: (data, callback) => {
+    db.sync()
+    .then(() => {
+      return UserLog.create(data.dataToInsert).then(() => {
+        callback(null, { status: "success", msg: "User log added" });
+      });
+    })
+    .catch((error) => {
+      callback(error, { msg: "Some error occured in adding the log" });
+    });
+  },
+
+  removeUserLog: (userId, cb) => {
+    UserLog.destroy({
+      where: {
+        user_id: userId.id,
+      },
+    })
+      .then((check) => {
+        if (check) {
+          cb(null, {
+            status: "success",
+            rowDeleted: check,
+            msg: "User logs deleted",
+          });
+        } else {
+          cb("Id not found", {
+            status: "failed",
+            msg: "Id not found",
+          });
+        }
+      })
+      .catch((err) => {
+        cb(err, {
+          status: "failed",
+          message: err,
+        });
+      });
+  }
 };

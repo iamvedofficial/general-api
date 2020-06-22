@@ -8,7 +8,7 @@ const fs = require("fs");
 const db = require("../../../config/sequelize/database");
 const User = require("../../../config/sequelize/User");
 const JoiValidation = require("../../helpers/joi/userValidation");
-const DBClass = require("./model/UserModel");
+const DBClass = require("./UserModel");
 const userHelper = require("../../helpers/UserHelper/userHelpers");
 const config = require("../../../config/config");
 const Helpers = require("../../helpers/UserHelper/userHelpers");
@@ -120,20 +120,15 @@ APIController.addBusiness = (req, res) => {
  * @return json response
  */
 APIController.userLogin = (req, res) => {
-  console.log("Inside the User Login:: ");
-  let sess = req.session;
-  console.log("Inside the login:: ", sess);
   function loginValidation(callback) {
     try {
       let data = req.body;
-      console.log("inside the login validation:: ", data, typeof data);
       const value = JoiValidation.loginSchema.validateAsync(data);
       value
         .then((checkValidation) => {
           callback(null, data);
         })
         .catch((err) => {
-          console.log("Error:: ", err);
           callback(err.details[0].message, null);
         });
     } catch (err) {
@@ -142,7 +137,6 @@ APIController.userLogin = (req, res) => {
   }
 
   function checkDB(data, callback) {
-    console.log("Check Email Id is present in Database");
     DBClass.select(
       {
         condition: {
@@ -151,8 +145,6 @@ APIController.userLogin = (req, res) => {
       },
       (err, result) => {
         if (!err) {
-          console.log("Inside the if Block:: ", err);
-          console.log("Result:: ", result);
           if (result.data.length) {
             callback(null, {
               status: "success",
@@ -166,7 +158,6 @@ APIController.userLogin = (req, res) => {
             });
           }
         } else {
-          console.log("Error:: ", err);
           callback(err, {
             status: "failed",
             err: err,
@@ -177,14 +168,12 @@ APIController.userLogin = (req, res) => {
   }
 
   function login(userData, callback) {
-    console.log("Hashed password from the database:: ", userData);
     if (
       !bcrypt.compareSync(
         userData.data.password,
         userData.userDetails.data[0].password
       )
     ) {
-      console.log("Wrong password!!!!!!!!!!");
       callback("password is wrong. please try again.", { code: 400 });
     } else {
       var tokenData = {
@@ -226,7 +215,6 @@ APIController.userLogin = (req, res) => {
   }
 
   function addUserLog(data, callback) {
-    console.log("Add User Log:: ", data);
     DBClass.addUserLog(
       {
         dataToInsert: {
@@ -260,7 +248,6 @@ APIController.userLogin = (req, res) => {
           data: result,
         });
       } else {
-        console.log("Error[]:: ", err);
         res.status(200).json({
           status: "failed",
           err: err,
@@ -297,9 +284,7 @@ APIController.removeUser = (req, res) => {
   }
 
   function checkToken(data, callback) {
-    console.log("Checking token in Remove user:: ", data);
     let decode = jwt.verify(token, config.TOKEN_GENERATION);
-    console.log("Decoded in remove:: ", decode);
     DBClass.select(
       {
         condition: {
@@ -318,7 +303,6 @@ APIController.removeUser = (req, res) => {
             });
           }
         } else {
-          console.log("Error:: ", err);
           callback(err, {
             status: "failed",
             err: err,
@@ -337,7 +321,6 @@ APIController.removeUser = (req, res) => {
         },
         (err, result) => {
           if (!err) {
-            console.log('Inside the remove user log:: ', result);
             callback(null, data);
           } else {
             callback(err, result);
@@ -407,7 +390,6 @@ APIController.updateUserDetails = (req, res) => {
             callback(null, data);
           })
           .catch((err) => {
-            console.log("Error:: ", err);
             callback(err.details[0].message, null);
           });
       } catch (err) {
@@ -433,7 +415,6 @@ APIController.updateUserDetails = (req, res) => {
       (err, result) => {
         if (!err) {
           if (result.data.length) {
-            console.log('Inside the checking token result in Edit profile:: ', result);
             callback(null, data);
           } else {
             callback("User not loged in.", {
@@ -442,7 +423,6 @@ APIController.updateUserDetails = (req, res) => {
             });
           }
         } else {
-          console.log("Error:: ", err);
           callback(err, {
             status: "failed",
             err: err,
@@ -463,7 +443,6 @@ APIController.updateUserDetails = (req, res) => {
         (err, result) => {
           if (!err) {
             if (result.data.length) {
-              console.log('Inside the checking is Admin:: ', result.data[0].dataValues.username);
               if(result.data[0].dataValues.user_type === "A"){
                 callback("Can't change Admin data", {status: "failed", msg: "not autorize to do the change"});
               } else{
@@ -476,7 +455,6 @@ APIController.updateUserDetails = (req, res) => {
               });
             }
           } else {
-            console.log("Error:: ", err);
             callback(err, {
               status: "failed",
               err: err,
@@ -490,7 +468,6 @@ APIController.updateUserDetails = (req, res) => {
   }
 
   function editUserDetails(passedData, callback) {
-    console.log("Passed Data by admin: ", passedData);
     try {
       if (fs.existsSync(passedData.oldPhotoPath)) {
         //file exists
@@ -532,10 +509,6 @@ APIController.updateUserDetails = (req, res) => {
                 }
               );
             } else {
-              console.log(
-                "Error inside the update query:: ",
-                err.errors[0].message
-              );
               callback(err.errors[0].message, result);
             }
           });
@@ -637,14 +610,12 @@ APIController.logout = (req, res) => {
   function validateData(callback) {
     try {
       let data = req.body;
-      console.log("inside the Logut validation:: ", data);
       const value = JoiValidation.logoutSchema.validateAsync(data);
       value
         .then((checkValidation) => {
           callback(null, data);
         })
         .catch((err) => {
-          console.log("Error:: ", err);
           callback(err.details[0].message, null);
         });
     } catch (err) {
@@ -654,7 +625,6 @@ APIController.logout = (req, res) => {
 
   function logoutUser(data, callback) {
     let decoded = jwt.verify(token, config.TOKEN_GENERATION);
-    console.log("decoded Object :: ", decoded);
     let values = { token: null };
     let selector = {
       where: { id: decoded.id },
@@ -669,7 +639,6 @@ APIController.logout = (req, res) => {
   }
 
   function addUserLog(userData, callback) {
-    console.log("Add User Log in logout:: ", userData);
     DBClass.addUserLog(
       {
         dataToInsert: {
