@@ -278,6 +278,7 @@ APIController.userLogin = (req, res) => {
  * @return json response
  */
 APIController.removeUser = (req, res) => {
+  let token = req.headers['x-access-token'];
   function validateId(callback) {
     try {
       let data = req.body;
@@ -297,12 +298,12 @@ APIController.removeUser = (req, res) => {
 
   function checkToken(data, callback) {
     console.log("Checking token in Remove user:: ", data);
-    let decode = jwt.verify(data.token, config.TOKEN_GENERATION);
+    let decode = jwt.verify(token, config.TOKEN_GENERATION);
     console.log("Decoded in remove:: ", decode);
     DBClass.select(
       {
         condition: {
-          token: data.token,
+          token: token,
           id: decode.id,
         },
       },
@@ -328,7 +329,7 @@ APIController.removeUser = (req, res) => {
   }
 
   function removeUserLogs(data, callback){
-    let decoded = jwt.verify(data.token, config.TOKEN_GENERATION);
+    let decoded = jwt.verify(token, config.TOKEN_GENERATION);
     if (decoded.user_type === "A") {
       DBClass.removeUserLog(
         {
@@ -352,7 +353,7 @@ APIController.removeUser = (req, res) => {
   }
 
   function removeUser(data, callback) {
-    let decoded = jwt.verify(data.token, config.TOKEN_GENERATION);
+    let decoded = jwt.verify(token, config.TOKEN_GENERATION);
     if (decoded.user_type === "A" && data.id !== decoded.id) {
       DBClass.delete(
         {
@@ -394,179 +395,10 @@ APIController.removeUser = (req, res) => {
           url(optional), email(optional)
 * @return json response
 */
-APIController.updateUserDetails_backup = (req, res) => {
-  function validateEdit(callback) {
-    if (req.body.token) {
-      try {
-        let data = req.body;
-        const value = JoiValidation.editSchema.validateAsync(data);
-        value
-          .then((checkValidation) => {
-            callback(null, data);
-          })
-          .catch((err) => {
-            console.log("Error:: ", err);
-            callback(err.details[0].message, null);
-          });
-      } catch (err) {
-        callback(err, null);
-      }
-    } else {
-      callback("Token required. Please login and get token.", {
-        err: "Token required. Please login and get token.",
-        err_type: "token_required",
-      });
-    }
-  }
-
-  function checkToken(data, callback) {
-    console.log("Checking token in Remove user:: ", data);
-    let decode = jwt.verify(data.token, config.TOKEN_GENERATION);
-    console.log("Decoded in remove:: ", decode);
-    DBClass.select(
-      {
-        condition: {
-          token: data.token,
-          id: decode.id,
-        },
-      },
-      (err, result) => {
-        if (!err) {
-          if (result.data.length) {
-            callback(null, data);
-          } else {
-            callback("User not loged in.", {
-              status: "failed",
-              err: "User not loged in.",
-            });
-          }
-        } else {
-          console.log("Error:: ", err);
-          callback(err, {
-            status: "failed",
-            err: err,
-          });
-        }
-      }
-    );
-  }
-
-  function deletePhoto(data, callback) {
-    console.log("Inside the delete Photo:: ", data);
-    if (req.file !== undefined) {
-      let decoded = jwt.verify(req.body.token, config.TOKEN_GENERATION);
-
-      if (decoded.user_type === "A") {
-        DBClass.select(
-          {
-            condition: {
-              id: data.id ? data.id : decoded.id,
-            },
-          },
-          (err, result) => {
-            if (!err) {
-              if (result.data.length) {
-                console.log("Selected Data[deleting old photo]:: ", result);
-                callback(null, { userData: res });
-              } else {
-                callback("Id not found.", {
-                  status: "failed",
-                  err: "Id not found. ",
-                });
-              }
-            } else {
-              console.log("Error:: ", err);
-              callback(err, {
-                status: "failed",
-                err: err,
-              });
-            }
-          }
-        );
-      }
-    }
-  }
-
-  function editUserDetails(passedData, callback) {
-    console.log("Passed Data by admin: ", passedData);
-    let values = [];
-    let decoded = jwt.verify(req.body.token, config.TOKEN_GENERATION);
-    if (decoded.user_type === "A") {
-      for (let [key, value] of Object.entries(passedData)) {
-        if (key != "id") {
-          values[key] = value;
-        }
-      }
-      if (req.file !== undefined) {
-        values["picture"] = req.file.path;
-      } else {
-        callback("Image required, Please add the picture.", {
-          msg: "Image required, Please add the picture.",
-          err_type: "image_required",
-        });
-      }
-
-      let selector = {
-        where: { id: passedData.id },
-      };
-
-      DBClass.update(values, selector, (err, result) => {
-        if (!err) {
-          callback(null, result);
-        } else {
-          callback(err, result);
-        }
-      });
-    } else {
-      for (let [key, value] of Object.entries(passedData)) {
-        if (key != "id") {
-          values[key] = value;
-        }
-      }
-      if (req.file !== undefined) {
-        values["picture"] = req.file.path;
-      } else {
-        callback("Image required, Please add the picture.", {
-          msg: "Image required, Please add the picture.",
-          err_type: "image_required",
-        });
-      }
-
-      let selector = {
-        where: { id: decoded.id },
-      };
-
-      DBClass.update(values, selector, (err, result) => {
-        if (!err) {
-          callback(null, result);
-        } else {
-          callback(err.errors[0].message, result);
-        }
-      });
-    }
-  }
-
-  async.waterfall(
-    [validateEdit, checkToken, deletePhoto, editUserDetails],
-    (err, result) => {
-      if (!err) {
-        res.status(200).json({
-          status: "success",
-          msg: " user data modified succesfully.",
-        });
-      } else {
-        res.json({
-          status: "failed",
-          err: err,
-        });
-      }
-    }
-  );
-};
-
 APIController.updateUserDetails = (req, res) => {
+  let token = req.headers['x-access-token'];
   function validateEdit(callback) {
-    if (req.body.token) {
+    if (token) {
       try {
         let data = req.body;
         const value = JoiValidation.editSchema.validateAsync(data);
@@ -589,13 +421,12 @@ APIController.updateUserDetails = (req, res) => {
     }
   }
 
-
   function checkToken(data, callback) {
-    let decode = jwt.verify(data.token, config.TOKEN_GENERATION);
+    let decode = jwt.verify(token, config.TOKEN_GENERATION);
     DBClass.select(
       {
         condition: {
-          token: data.token,
+          token: token,
           id: decode.id,
         },
       },
@@ -664,7 +495,7 @@ APIController.updateUserDetails = (req, res) => {
       if (fs.existsSync(passedData.oldPhotoPath)) {
         //file exists
         let values = [];
-        let decoded = jwt.verify(req.body.token, config.TOKEN_GENERATION);
+        let decoded = jwt.verify(token, config.TOKEN_GENERATION);
         if (decoded.user_type === "A") {
           for (let [key, value] of Object.entries(passedData)) {
             if (key != "id") {
@@ -777,10 +608,18 @@ APIController.updateUserDetails = (req, res) => {
           msg: " user data modified succesfully.",
         });
       } else {
-        res.json({
-          status: "failed",
-          err: err,
-        });
+        Helpers.deleteFileFromTheFolder(
+          {
+            path: req.file.path,
+          },
+          (err, result) => {
+            res.json({
+              status: "failed",
+              err: err,
+            });
+          }
+        );
+        
       }
     }
   );
@@ -794,6 +633,7 @@ APIController.updateUserDetails = (req, res) => {
  * @return json response
  */
 APIController.logout = (req, res) => {
+  let token = req.headers['x-access-token'];
   function validateData(callback) {
     try {
       let data = req.body;
@@ -813,7 +653,7 @@ APIController.logout = (req, res) => {
   }
 
   function logoutUser(data, callback) {
-    let decoded = jwt.verify(data.token, config.TOKEN_GENERATION);
+    let decoded = jwt.verify(token, config.TOKEN_GENERATION);
     console.log("decoded Object :: ", decoded);
     let values = { token: null };
     let selector = {
