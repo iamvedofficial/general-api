@@ -616,7 +616,12 @@ APIController.logout = (req, res) => {
           callback(null, data);
         })
         .catch((err) => {
-          callback(err.details[0].message, null);
+          console.log('Error in validation:: ', err);
+          if(err.name === "JsonWebTokenError"){
+            callback("Token error", {status: 'failed', err_msg: 'token_error'});
+          } else{
+            callback(err.details[0].message, null);
+          }
         });
     } catch (err) {
       callback(err, null);
