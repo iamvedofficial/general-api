@@ -10,5 +10,9 @@ router.use((req, res, next) => {
 
 router.post("/add", BusinessController.addBusiness);
 
+router.put("/edit", BusinessController.editBusiness);
+
+router.delete('/delete', BusinessController.deleteBusiness);
+
 module.exports = router;
 
