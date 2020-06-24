@@ -1,8 +1,6 @@
-const Joi = require("@hapi/joi");
 const jwt = require("jsonwebtoken");
 const async = require("async");
 
-const db = require("../../../config/sequelize/database");
 const businessModel = require("./businessModel");
 const userModel = require("../user/UserModel");
 const Business = require("../../../config/sequelize/Business");
@@ -167,14 +165,12 @@ BusinessController.editBusiness = (req, res) => {
 
   function validateData(data, callback){
     try {
-      console.log('Data passed from the validate token:: ', data)
       const value = validator.editBusinessValidation.validateAsync(data);
       value
         .then((checkValidation) => {
           callback(null, data);
         })
         .catch((err) => {
-          console.log('Error in validate data:: ', err);
           callback(err.details[0].message, null);
         });
     } catch (err) {
@@ -188,10 +184,8 @@ BusinessController.editBusiness = (req, res) => {
     };
     businessModel.update(data, selector, (err, result) => {
       if (!err) {
-        console.log('result:: ', result);
         callback(null, result);
       } else {
-        console.log('Error in edit business:: ', err);
         callback(err, { msg: "Error in adding token" });
       }
     });
@@ -272,11 +266,9 @@ BusinessController.deleteBusiness = (req, res) => {
     value.then(validationResult=>{
       callback(null, data);
     }).catch(err => {
-      console.log('Error in validate data:: ', err);
       callback(err.details[0].message, null);
     })
    } catch(e){
-     console.log('Some Exception Occured:: ', e);
      callback("some error in validating the passed data", {status: "failed", msg: "validation_error", err: e})
    }
   }

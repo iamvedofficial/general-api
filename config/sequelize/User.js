@@ -1,7 +1,6 @@
 // The User model.
 const Sequelize = require('sequelize');
 
-const config = require('../config');
 const db = require('./database');
 
 var modelDefinition = {
@@ -19,7 +18,8 @@ var modelDefinition = {
         allowNull: false,
     },
     user_type: {
-        type: Sequelize.STRING
+        type: Sequelize.STRING,
+        allowNull: false
     },
     mobile: {
         type: Sequelize.STRING,

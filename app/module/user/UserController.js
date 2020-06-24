@@ -1,20 +1,16 @@
-const Joi = require("@hapi/joi");
 const async = require("async");
-const multer = require("multer");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const fs = require("fs");
 
-const db = require("../../../config/sequelize/database");
 const User = require("../../../config/sequelize/User");
 const JoiValidation = require("../../helpers/joi/userValidation");
 const DBClass = require("./UserModel");
-const userHelper = require("../../helpers/UserHelper/userHelpers");
 const config = require("../../../config/config");
 const Helpers = require("../../helpers/UserHelper/userHelpers");
 
-// The authentication controller.
-const APIController = {};
+// The User controller.
+const UserController = {};
+
 /*
  *   Add user in database
  *
@@ -23,7 +19,7 @@ const APIController = {};
  * @return json response
  */
 
-APIController.register = (req, res) => {
+UserController.register = (req, res) => {
   function validateData(callback) {
     try {
       let data = req.body;
@@ -55,7 +51,11 @@ APIController.register = (req, res) => {
         if (!err) {
           callback(null, result);
         } else {
-          callback(err, result);
+          if (err.name === "SequelizeUniqueConstraintError") {
+            callback(err.errors[0].message, null);
+          } else {
+            callback("Error in registering the user", result);
+          }
         }
       }
     );
@@ -68,10 +68,24 @@ APIController.register = (req, res) => {
         msg: "User added successfully",
       });
     } else {
-      res.json({
-        status: "failed",
-        err: err,
-      });
+      if (req.file) {
+        Helpers.deleteFileFromTheFolder(
+          {
+            path: req.file.path,
+          },
+          (error, result) => {
+            res.json({
+              status: "failed",
+              err: err,
+            });
+          }
+        );
+      } else {
+        res.json({
+          status: "failed",
+          err: err,
+        });
+      }
     }
   });
 };
@@ -83,7 +97,7 @@ APIController.register = (req, res) => {
  * @param  id, url, location
  * @return json response
  */
-APIController.addBusiness = (req, res) => {
+UserController.addBusiness = (req, res) => {
   let passedData = req.body;
 
   let values = { url: passedData.url, location: passedData.location };
@@ -119,7 +133,7 @@ APIController.addBusiness = (req, res) => {
  * @param  id(required), password(required)
  * @return json response
  */
-APIController.userLogin = (req, res) => {
+UserController.userLogin = (req, res) => {
   function loginValidation(callback) {
     try {
       let data = req.body;
@@ -264,13 +278,265 @@ APIController.userLogin = (req, res) => {
  * @param  id
  * @return json response
  */
-APIController.removeUser = (req, res) => {
-  let token = req.headers['x-access-token'];
-  function validateId(callback) {
+
+UserController.removeUser = (req, res) => {
+  let token = req.headers["x-access-token"];
+  function validateToken(callback) {
     try {
       let data = req.body;
+      const decoded = jwt.verify(token, config.TOKEN_GENERATION);
+      if (decoded.user_type === "A") {
+        DBClass.select(
+          {
+            condition: {
+              token: token,
+              id: decoded.id,
+            },
+          },
+          (err, result) => {
+            if (!err) {
+              if (result.data.length) {
+                callback(null, data);
+              } else {
+                callback("User not loged in.", {
+                  status: "failed",
+                  err: "User not loged in.",
+                });
+              }
+            } else {
+              callback(err, {
+                status: "failed",
+                err: err,
+              });
+            }
+          }
+        );
+      } else {
+        callback("Not authorized to do this action", {
+          status: "failed",
+          err_msg: "authorization_error",
+        });
+      }
+    } catch (err) {
+      if (err.name === "TokenExpiredError") {
+        callback("Token expired", {
+          status: "failed",
+          err_msg: "token_expired",
+        });
+      } else {
+        callback("Error in token", {
+          status: "failed",
+          err_msg: "token_error",
+        });
+      }
+    }
+  }
 
+  function validateId(data, callback) {
+    try {
+      const decoded = jwt.verify(token, config.TOKEN_GENERATION);
       const value = JoiValidation.removeSchema.validateAsync(data);
+      value
+        .then((checkValidation) => {
+          DBClass.select(
+            {
+              condition: {
+                id: data.id,
+              },
+            },
+            (err, result) => {
+              if (!err) {
+                if (result.data.length) {
+                  
+                  if (result.data[0].dataValues.user_type === "A" && data.id != decoded.id) {
+                    callback("Not authorized to remove this user", null);
+                  } else {
+                    callback(null, result.data[0].dataValues);
+                  }
+                } else {
+                  callback("Id not found in DB", {
+                    status: "failed",
+                    err: "Id not found in DB",
+                  });
+                }
+              } else {
+                callback(err, {
+                  status: "failed",
+                  err: err,
+                });
+              }
+            }
+          );
+        })
+        .catch((err) => {
+          callback(err.details[0].message, null);
+        });
+    } catch (err) {
+      callback(err, null);
+    }
+  }
+
+
+  function removeUserLogs(data, callback) {
+    DBClass.removeUserLog(
+      {
+        id: data.id,
+      },
+      (err, result) => {
+        if (!err) {
+          callback(null, data);
+        } else if (result.err_type === "unknown_id") {
+          callback(null, data);
+        } else {
+          callback(err, result);
+        }
+      }
+    );
+  }
+
+  function removeUserFromDB(data, callback) {
+    DBClass.delete(
+      {
+        id: data.id,
+      },
+      (err, result) => {
+        if (!err) {
+          if (data.picture) {
+            Helpers.deleteFileFromTheFolder(
+              {
+                path: data.picture,
+              },
+              (err, result) => {
+                if (!err && result.status === "success") {
+                  callback(null, data);
+                } else {
+                  callback("Error in deleteing the file", {
+                    status: "failed",
+                  });
+                }
+              }
+            );
+          } else {
+            callback(null, data);
+          }
+          // callback(null, data);
+        } else {
+          callback(err, result);
+        }
+      }
+    );
+  }
+
+  async.waterfall(
+    [validateToken, validateId, removeUserLogs, removeUserFromDB],
+    (err, result) => {
+      if (!err) {
+        res.status(200).json({
+          status: "success",
+          msg: "User removed from database",
+        });
+      } else {
+        res.json({
+          status: "failed",
+          err: err,
+        });
+      }
+    }
+  );
+};
+
+/*
+* Edit user's details in database
+* 
+* @function   updateUserDetails
+* @param  id(required for Admin), name(optional),mobile(optional),
+          url(optional), email(optional)
+* @return json response
+*/
+UserController.updateUserDetails = (req, res) => {
+  let token = req.headers["x-access-token"];
+  function validateToken(callback) {
+    try {
+      let data = req.body;
+      const decoded = jwt.verify(token, config.TOKEN_GENERATION);
+      if (decoded.user_type === "A") {
+        DBClass.select(
+          {
+            condition: {
+              token: token,
+              id: decoded.id,
+            },
+          },
+          (err, result) => {
+            if (!err) {
+              if (result.data.length) {
+                callback(null, data);
+              } else {
+                callback("User not loged in.", {
+                  status: "failed",
+                  err: "User not loged in.",
+                });
+              }
+            } else {
+              callback(err, {
+                status: "failed",
+                err: err,
+              });
+            }
+          }
+        );
+      } else if (decoded.user_type === "U") {
+        if (decoded.id == data.id || data.id === undefined) {
+          DBClass.select(
+            {
+              condition: {
+                token: token,
+                id: decoded.id,
+              },
+            },
+            (err, result) => {
+              if (!err) {
+                if (result.data.length) {
+                  callback(null, data);
+                } else {
+                  callback("User not loged in.", {
+                    status: "failed",
+                    err: "User not loged in.",
+                  });
+                }
+              } else {
+                callback(err, {
+                  status: "failed",
+                  err: err,
+                });
+              }
+            }
+          );
+        } else {
+          callback("Not Authorized to do edit", {
+            status: "failed",
+            msg: "authorization_error",
+          });
+        }
+      }
+    } catch (err) {
+      if (err.name === "TokenExpiredError") {
+        callback("Token expired", {
+          status: "failed",
+          err_msg: "token_expired",
+        });
+      } else {
+        callback("Error in token", {
+          status: "failed",
+          err_msg: "token_error",
+        });
+      }
+    }
+  }
+
+  function validateEdit(data, callback) {
+    try {
+      const value = JoiValidation.editSchema.validateAsync(data);
       value
         .then((checkValidation) => {
           callback(null, data);
@@ -283,297 +549,87 @@ APIController.removeUser = (req, res) => {
     }
   }
 
-  function checkToken(data, callback) {
-    let decode = jwt.verify(token, config.TOKEN_GENERATION);
-    DBClass.select(
-      {
-        condition: {
-          token: token,
-          id: decode.id,
-        },
-      },
-      (err, result) => {
-        if (!err) {
-          if (result.data.length) {
-            callback(null, data);
-          } else {
-            callback("User not loged in.", {
-              status: "failed",
-              err: "User not loged in.",
-            });
-          }
-        } else {
-          callback(err, {
-            status: "failed",
-            err: err,
-          });
-        }
-      }
-    );
-  }
-
-  function removeUserLogs(data, callback){
-    let decoded = jwt.verify(token, config.TOKEN_GENERATION);
-    if (decoded.user_type === "A") {
-      DBClass.removeUserLog(
-        {
-          id: data.id,
-        },
-        (err, result) => {
-          if (!err) {
-            callback(null, data);
-          } else {
-            callback(err, result);
-          }
-        }
-      );
-    } else {
-      callback("Authentication required to do this action.", {
-        msg: "Authentication required",
-        err_msg: "authentication_required",
-      });
-    }
-  }
-
-  function removeUser(data, callback) {
-    let decoded = jwt.verify(token, config.TOKEN_GENERATION);
-    if (decoded.user_type === "A" && data.id !== decoded.id) {
-      DBClass.delete(
-        {
-          id: data.id,
-        },
-        (err, result) => {
-          if (!err) {
-            callback(null, result);
-          } else {
-            callback(err, result);
-          }
-        }
-      );
-    } else {
-      callback("Authentication required to do this action.", {
-        msg: "Authentication required",
-        err_msg: "authentication_required",
-      });
-    }
-  }
-
-  async.waterfall([validateId, checkToken, removeUserLogs, removeUser], (err, result) => {
-    if (!err) {
-      res.status(200).json(result);
-    } else {
-      res.json({
-        status: "failed",
-        err: err,
-      });
-    }
-  });
-};
-
-/*
-* Edit user's details in database
-* 
-* @function   updateUserDetails
-* @param  id(required for Admin), name(optional),mobile(optional),
-          url(optional), email(optional)
-* @return json response
-*/
-APIController.updateUserDetails = (req, res) => {
-  let token = req.headers['x-access-token'];
-  function validateEdit(callback) {
-    if (token) {
-      try {
-        let data = req.body;
-        const value = JoiValidation.editSchema.validateAsync(data);
-        value
-          .then((checkValidation) => {
-            callback(null, data);
-          })
-          .catch((err) => {
-            callback(err.details[0].message, null);
-          });
-      } catch (err) {
-        callback(err, null);
-      }
-    } else {
-      callback("Token required. Please login and get token.", {
-        err: "Token required. Please login and get token.",
-        err_type: "token_required",
-      });
-    }
-  }
-
-  function checkToken(data, callback) {
-    let decode = jwt.verify(token, config.TOKEN_GENERATION);
-    DBClass.select(
-      {
-        condition: {
-          token: token,
-          id: decode.id,
-        },
-      },
-      (err, result) => {
-        if (!err) {
-          if (result.data.length) {
-            callback(null, data);
-          } else {
-            callback("User not loged in.", {
-              status: "failed",
-              err: "User not loged in.",
-            });
-          }
-        } else {
-          callback(err, {
-            status: "failed",
-            err: err,
-          });
-        }
-      }
-    );
-  }
-
   function isAdmin(data, callback) {
-    if(data.id){
-      DBClass.select(
-        {
-          condition: {
-            id: data.id,
-          },
+    const decoded = jwt.verify(token, config.TOKEN_GENERATION);
+    DBClass.select(
+      {
+        condition: {
+          id: data.id ? data.id : decoded.id,
         },
-        (err, result) => {
-          if (!err) {
-            if (result.data.length) {
-              if(result.data[0].dataValues.user_type === "A"){
-                callback("Can't change Admin data", {status: "failed", msg: "not autorize to do the change"});
-              } else{
-                callback(null, data);
-              }
-            } else {
-              callback("User not found.", {
+      },
+      (err, result) => {
+        if (!err) {
+          if (result.data.length) {
+            if (result.data[0].dataValues.user_type === "A" && decoded.id != result.data[0].dataValues.id) {
+              callback("Not authorized to do this action", {
                 status: "failed",
-                err: "User not found.",
+                err_type: "authorization_error",
               });
+            } else {
+              callback(null, data);
             }
           } else {
-            callback(err, {
+            callback("Id Not Found in Db.", {
               status: "failed",
-              err: err,
+              err: "Id not found in Db.",
             });
+          }
+        } else {
+          callback(err, {
+            status: "failed",
+            err: err,
+          });
+        }
+      }
+    );
+  }
+
+  function modifyUserDetails(passedData, callback) {
+    try {
+      let decoded = jwt.verify(token, config.TOKEN_GENERATION);
+      let values = [];
+      for (let [key, value] of Object.entries(passedData)) {
+        if (key != "id") {
+          values[key] = value;
+        }
+      }
+      if (req.file !== undefined) {
+        values["picture"] = req.file.path;
+      } else {
+        callback("Image required, Please add the picture.", {
+          msg: "Image required, Please add the picture.",
+          err_type: "image_required",
+        });
+      }
+
+      let selector = {
+        where: { id: passedData.id ? passedData.id : decoded.id },
+      };
+      Helpers.deleteFileFromTheFolder(
+        {
+          path: passedData.oldPhotoPath,
+        },
+        (err, result) => {
+          if (!err && result.status === "success") {
+            DBClass.update(values, selector, (err, result) => {
+              if (!err) {
+               callback(null, result);
+              } else {
+                callback(err.errors[0].message, result);
+              }
+            });
+          } else {
+            callback(err, result);
           }
         }
       );
-    } else {
-      callback(null, data);
-    }
-  }
-
-  function editUserDetails(passedData, callback) {
-    try {
-      if (fs.existsSync(passedData.oldPhotoPath)) {
-        //file exists
-        let values = [];
-        let decoded = jwt.verify(token, config.TOKEN_GENERATION);
-        if (decoded.user_type === "A") {
-          for (let [key, value] of Object.entries(passedData)) {
-            if (key != "id") {
-              values[key] = value;
-            }
-          }
-          if (req.file !== undefined) {
-            values["picture"] = req.file.path;
-          } else {
-            callback("Image required, Please add the picture.", {
-              msg: "Image required, Please add the picture.",
-              err_type: "image_required",
-            });
-          }
-
-          let selector = {
-            where: { id: passedData.id ? passedData.id : decoded.id },
-          };
-
-          DBClass.update(values, selector, (err, result) => {
-            if (!err) {
-              Helpers.deleteFileFromTheFolder(
-                {
-                  path: passedData.oldPhotoPath,
-                },
-                (err, result) => {
-                  if (!err && result.status === "success") {
-                    callback(null, result);
-                  } else {
-                    callback("Error in deleteing the file", {
-                      status: "failed",
-                    });
-                  }
-                }
-              );
-            } else {
-              callback(err.errors[0].message, result);
-            }
-          });
-        } else {
-          for (let [key, value] of Object.entries(passedData)) {
-            if (key != "id") {
-              values[key] = value;
-            }
-          }
-          if (req.file !== undefined) {
-            values["picture"] = req.file.path;
-          } else {
-            callback("Image required, Please add the picture.", {
-              msg: "Image required, Please add the picture.",
-              err_type: "image_required",
-            });
-          }
-
-          let selector = {
-            where: { id: decoded.id },
-          };
-
-          DBClass.update(values, selector, (err, result) => {
-            if (!err) {
-              Helpers.deleteFileFromTheFolder(
-                {
-                  path: passedData.oldPhotoPath,
-                },
-                (err, response) => {
-                  if (!err && response.status === "success") {
-                    callback(null, result);
-                  } else {
-                    callback("Error in deleteing the file", {
-                      status: "failed",
-                    });
-                  }
-                }
-              );
-              // callback(null, result);
-            } else {
-              callback(err, result);
-            }
-          });
-        }
-      } else {
-        Helpers.deleteFileFromTheFolder(
-          {
-            path: req.file.path
-          },
-          (err, result) => {
-            callback("Old Photo path is not valid", {
-              status: "failed",
-              msg: "image path mot find",
-            });
-          }
-        );
-      }
     } catch (err) {
-      console.error(err);
       callback(err, null);
     }
   }
 
   async.waterfall(
-    [validateEdit, checkToken, isAdmin, editUserDetails],
+    [validateToken, validateEdit, isAdmin, modifyUserDetails],
     (err, result) => {
       if (!err) {
         res.status(200).json({
@@ -585,14 +641,13 @@ APIController.updateUserDetails = (req, res) => {
           {
             path: req.file.path,
           },
-          (err, result) => {
+          (error, result) => {
             res.json({
               status: "failed",
               err: err,
             });
           }
         );
-        
       }
     }
   );
@@ -605,8 +660,8 @@ APIController.updateUserDetails = (req, res) => {
  * @param  token(required)
  * @return json response
  */
-APIController.logout = (req, res) => {
-  let token = req.headers['x-access-token'];
+UserController.logout = (req, res) => {
+  let token = req.headers["x-access-token"];
   function validateData(callback) {
     try {
       let data = req.body;
@@ -616,10 +671,12 @@ APIController.logout = (req, res) => {
           callback(null, data);
         })
         .catch((err) => {
-          console.log('Error in validation:: ', err);
-          if(err.name === "JsonWebTokenError"){
-            callback("Token error", {status: 'failed', err_msg: 'token_error'});
-          } else{
+          if (err.name === "JsonWebTokenError") {
+            callback("Token error", {
+              status: "failed",
+              err_msg: "token_error",
+            });
+          } else {
             callback(err.details[0].message, null);
           }
         });
@@ -680,4 +737,4 @@ APIController.logout = (req, res) => {
   });
 };
 
-module.exports = APIController;
+module.exports = UserController;

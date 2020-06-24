@@ -38,8 +38,7 @@ const editSchema = Joi.object({
 });
 
 const removeSchema = Joi.object({
-  id: Joi.string().required(),
-  // token: Joi.string().required()
+  id: Joi.string().required()
 });
 
 const loginSchema = Joi.object({

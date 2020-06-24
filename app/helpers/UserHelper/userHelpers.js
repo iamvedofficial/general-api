@@ -1,6 +1,4 @@
-const crypto = require('crypto');
 const fs = require('fs');
-const config = require('../../helpers/UserHelper/userHelpers');
 
 module.exports = {
     deleteFileFromTheFolder:  (data, callback)=>{
@@ -15,7 +13,7 @@ module.exports = {
                     }
                 });
             } else {
-                callback('Filename does not exists or invalid filename', {status: 'failed', msg: 'Filename does not exists or invalid filename'});
+                callback('Filename does not exists', {status: 'failed', msg: 'Filename does not exists', err_type: "file_not_find"});
             }
         }
     }

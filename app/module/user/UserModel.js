@@ -110,6 +110,7 @@ module.exports = {
           cb("Id not found", {
             status: "failed",
             msg: "Id not found",
+            err_type: "unknown_id"
           });
         }
       })

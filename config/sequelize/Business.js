@@ -1,7 +1,6 @@
-// The User model.
+
 const Sequelize = require('sequelize');
 
-const config = require('../config');
 const db = require('./database');
 
 var modelDefinition = {
@@ -10,8 +9,7 @@ var modelDefinition = {
         allowNull: false
     },
     description: {
-        type: Sequelize.STRING,
-        unique: true,
+        type: Sequelize.TEXT,
         allowNull: true
     },
     status: {
