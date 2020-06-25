@@ -1,6 +1,7 @@
 const db = require("../../../config/sequelize/database");
 const User = require("../../../config/sequelize/User");
 const UserLog = require("../../../config/sequelize/UserLog");
+const BusinessUser = require("../../../config/sequelize/BusinessUser");
 
 module.exports = {
   insert: (data, callback) => {
@@ -120,5 +121,64 @@ module.exports = {
           message: err,
         });
       });
-  }
+  },
+
+  addUserBusiness: (data, callback) => {
+    db.sync()
+    .then(() => {
+      return BusinessUser.create(data.dataToInsert).then(() => {
+        callback(null, { status: "success", msg: "User log added" });
+      });
+    })
+    .catch((error) => {
+      callback(error, { msg: "Some error occured in adding the log" });
+    });
+  },
+
+  findBusiness: (data, cb) => {
+    BusinessUser.findAll({
+      where: data.condition,
+      order: [["createdAt", "DESC"]],
+    }).then(function (entries) {
+      cb(null, {
+        status: "success",
+        data: entries,
+      });
+    })
+    .catch((err)=>{
+      cb(err, {
+        status: "failed",
+        message: err
+      });
+    });
+  },
+
+  removeUserBusiness: (userId, cb) => {
+    BusinessUser.destroy({
+      where: {
+        user_id: userId.id,
+      },
+    })
+      .then((check) => {
+        if (check) {
+          cb(null, {
+            status: "success",
+            rowDeleted: check,
+            msg: "User business deleted",
+          });
+        } else {
+          cb("Id not found", {
+            status: "failed",
+            msg: "Id not found",
+            err_type: "unknown_id"
+          });
+        }
+      })
+      .catch((err) => {
+        cb(err, {
+          status: "failed",
+          message: err,
+        });
+      });
+  },
 };

@@ -49,6 +49,7 @@ const loginSchema = Joi.object({
   password: Joi.string().required(),
 });
 
+
 const logoutSchema = Joi.object({
   token: Joi.string().optional()
 })

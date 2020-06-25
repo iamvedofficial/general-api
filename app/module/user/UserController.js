@@ -4,6 +4,7 @@ const jwt = require("jsonwebtoken");
 
 const User = require("../../../config/sequelize/User");
 const JoiValidation = require("../../helpers/joi/userValidation");
+const BusinessValidator = require("../../helpers/joi/userBusinessValidation");
 const DBClass = require("./UserModel");
 const config = require("../../../config/config");
 const Helpers = require("../../helpers/UserHelper/userHelpers");
@@ -42,6 +43,7 @@ UserController.register = (req, res) => {
         dataToInsert: {
           username: data.username,
           email: data.email,
+          user_type: "U",
           password: bcrypt.hashSync(data.password, 10),
           mobile: data.mobile,
           picture: req.file !== undefined ? req.file.path : null,
@@ -270,6 +272,7 @@ UserController.userLogin = (req, res) => {
     }
   );
 };
+
 /*
  * Delete user's details from database
  * only admin can remove any user from data base
@@ -347,8 +350,10 @@ UserController.removeUser = (req, res) => {
             (err, result) => {
               if (!err) {
                 if (result.data.length) {
-                  
-                  if (result.data[0].dataValues.user_type === "A" && data.id != decoded.id) {
+                  if (
+                    result.data[0].dataValues.user_type === "A" &&
+                    data.id != decoded.id
+                  ) {
                     callback("Not authorized to remove this user", null);
                   } else {
                     callback(null, result.data[0].dataValues);
@@ -376,9 +381,25 @@ UserController.removeUser = (req, res) => {
     }
   }
 
-
   function removeUserLogs(data, callback) {
     DBClass.removeUserLog(
+      {
+        id: data.id,
+      },
+      (err, result) => {
+        if (!err) {
+          callback(null, data);
+        } else if (result.err_type === "unknown_id") {
+          callback(null, data);
+        } else {
+          callback(err, result);
+        }
+      }
+    );
+  }
+
+  function removeUserBusiness(data, callback) {
+    DBClass.removeUserBusiness(
       {
         id: data.id,
       },
@@ -560,7 +581,10 @@ UserController.updateUserDetails = (req, res) => {
       (err, result) => {
         if (!err) {
           if (result.data.length) {
-            if (result.data[0].dataValues.user_type === "A" && decoded.id != result.data[0].dataValues.id) {
+            if (
+              result.data[0].dataValues.user_type === "A" &&
+              decoded.id != result.data[0].dataValues.id
+            ) {
               callback("Not authorized to do this action", {
                 status: "failed",
                 err_type: "authorization_error",
@@ -613,7 +637,7 @@ UserController.updateUserDetails = (req, res) => {
           if (!err && result.status === "success") {
             DBClass.update(values, selector, (err, result) => {
               if (!err) {
-               callback(null, result);
+                callback(null, result);
               } else {
                 callback(err.errors[0].message, result);
               }
@@ -648,6 +672,92 @@ UserController.updateUserDetails = (req, res) => {
             });
           }
         );
+      }
+    }
+  );
+};
+
+UserController.addUserBusiness = (req, res) => {
+  function validateData(callback) {
+    try {
+      let data = req.body;
+      const validation = BusinessValidator.addBusinessSchema.validateAsync(
+        data
+      );
+      validation
+        .then((checkValidation) => {
+          callback(null, data);
+        })
+        .catch((err) => {
+          callback(err.details[0].message, null);
+        });
+    } catch (err) {
+      callback(err, null);
+    }
+  }
+
+  function checkBusiness(data, callback) {
+    DBClass.findBusiness(
+      {
+        condition: {
+          business_id: data.business_id,
+        },
+      },
+      (err, result) => {
+        if (!err) {
+          if (result.data.length) {
+            callback("Business already added", {
+              status: "failed",
+              msg: "Business alrady added",
+            });
+          } else {
+            callback(null, data);
+          }
+        } else {
+          callback(err, {
+            status: "failed",
+            err: err,
+          });
+        }
+      }
+    );
+  }
+
+  function addUserBusiness(data, callback) {
+    DBClass.addUserBusiness(
+      {
+        dataToInsert: {
+          user_id: data.user_id,
+          business_id: data.business_id,
+        },
+      },
+      (err, result) => {
+        if (!err) {
+          callback(null, result);
+        } else {
+          if (err.name === "SequelizeForeignKeyConstraintError") {
+            callback(err.fields[0] + " is not present in parent table.", null);
+          } else {
+            callback(err, result);
+          }
+        }
+      }
+    );
+  }
+
+  async.waterfall(
+    [validateData, checkBusiness, addUserBusiness],
+    (error, result) => {
+      if (!error) {
+        res.status(200).json({
+          status: "success",
+          msg: "User Business added in db successfully",
+        });
+      } else {
+        res.status(400).json({
+          status: "failed",
+          err: error,
+        });
       }
     }
   );
