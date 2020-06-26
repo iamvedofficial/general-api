@@ -92,41 +92,6 @@ UserController.register = (req, res) => {
   });
 };
 
-/*
- *   Add url and location in database
- *
- * @function   addBusiness
- * @param  id, url, location
- * @return json response
- */
-UserController.addBusiness = (req, res) => {
-  let passedData = req.body;
-
-  let values = { url: passedData.url, location: passedData.location };
-  let selector = {
-    where: { id: passedData.userId },
-  };
-
-  User.update(values, selector)
-    .then((rowsUpdated) => {
-      if (rowsUpdated[0]) {
-        res.json({
-          rowUpdated: rowsUpdated[0],
-          msg: "Data updated",
-        });
-      } else {
-        res.json({
-          rowUpdated: rowsUpdated[0],
-          msg: "Id Doesn't found",
-        });
-      }
-    })
-    .catch((err) => {
-      res.status(400).json({
-        err_msg: err,
-      });
-    });
-};
 
 /*
  * login user
