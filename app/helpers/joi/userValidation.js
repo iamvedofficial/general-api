@@ -10,6 +10,8 @@ const registerSchema = Joi.object({
   }),
 
   mobile: Joi.string().pattern(new RegExp("^[0-9]{10}$")).min(10).max(10),
+
+  base64image: Joi.string().pattern(new RegExp("^data:([A-Za-z-+\/]+);base64,(.+)$")).optional()
 });
 
 const editSchema = Joi.object({

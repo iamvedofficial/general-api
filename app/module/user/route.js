@@ -3,7 +3,7 @@ const express = require("express");
 const app = express.Router();
 const jwt = require("jsonwebtoken");
 const multer = require("multer");
-const path = require("path");
+const upload = multer({dest: 'public/upload/images'});
 
 const APIController = require("./UserController");
 const config = require("../../../config/config");
@@ -12,29 +12,6 @@ app.use((req, res, next) => {
   // .. some logic here .. like any other middleware
   next();
 });
-
-let storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    if (file.mimetype == "image/jpeg" || file.mimetype == "image/png") {
-      cb(
-        null,
-        path.join(path.dirname(require.main.filename), "public/upload/images")
-      );
-    } else {
-      cb("File type not allowed", null);
-    }
-  },
-  filename: function (req, file, cb) {
-    cb(
-      null,
-      file.fieldname + "_" + Date.now() + "" + path.extname(file.originalname)
-    );
-  },
-});
-
-let upload = multer({
-  storage: storage,
-}).single("imagePost");
 
 app.post("/get-Token", (req, res) => {
   // Authenticate User
@@ -45,13 +22,16 @@ app.post("/get-Token", (req, res) => {
   res.json({ accessToken: accessToken });
 });
 
-app.post("/register", upload, APIController.register);
+//app.post("/register", upload, APIController.register); //main register
+app.post("/register", APIController.register);
 
 app.post("/user-login", APIController.userLogin);
 
 app.delete("/remove-user", APIController.removeUser);
 
-app.put("/update-details", upload, APIController.updateUserDetails);
+// app.put("/update-details", upload, APIController.updateUserDetails); // old main
+
+app.put("/update-details", APIController.updateUserDetails); 
 
 app.post("/users/add-business", authenticateTokenForAdmin, APIController.addUserBusiness);
 

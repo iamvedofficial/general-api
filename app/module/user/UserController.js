@@ -1,6 +1,9 @@
 const async = require("async");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const mime = require("mime");
+const fs = require("fs");
+const path = require("path");
 
 const User = require("../../../config/sequelize/User");
 const JoiValidation = require("../../helpers/joi/userValidation");
@@ -37,6 +40,44 @@ UserController.register = (req, res) => {
     }
   }
 
+  function uploadImage(data, callback){
+    var response = {};
+    const imageBase64 = (data.base64image).trim();
+    const regex = /^data:([A-Za-z-+\/]+);base64,(.+)$/;
+    const found = imageBase64.match(regex);
+    
+    if(found !== null){
+      const extensionType = imageBase64.split(";")[0].split(":")[1];
+      const base64encoded = imageBase64.split(";")[1].split(",")[1];
+  
+      const buffer = Buffer.from(imageBase64.substring(imageBase64.indexOf(',') + 1), 'base64');
+      let extension = mime.extension(extensionType);
+      if(extension === 'jpeg' || extension === 'jpg' || extension === 'png'){
+        if(buffer.length <= 1024*1024){
+          response.data = new Buffer(base64encoded, "base64");
+          let decodedImg = response;
+          let imageBuffer = decodedImg.data;
+         
+          let fileName = "image_" + Date.now() + "." + extension;
+          try {
+            fs.writeFileSync("public/upload/images/" + fileName, imageBuffer, "utf8");
+            //data.imagePath = 'E:/prog_pract/NodeJS/bitbucket/general-api/public/upload/images/'+fileName;
+            data.imagePath = path.join('E:/prog_pract/NodeJS/bitbucket/general-api/public/upload/images/', fileName);
+            callback(null, data);
+          } catch (e) {
+            callback("error in uploading the image", {status: "failed", msg: "error in uploading the image"});
+          }
+        } else {     
+          callback("image size is not valid", {status: 'failed', msg: "image size is not valid"});
+        }
+      } else {
+       callback("file is not valid",{ status: "failed", msg: "file is not valid" });
+      }
+    } else {
+      callback("image base64 is not valid",{ status: "failed", msg: "image base64 is not valid" });
+    }
+  }
+
   function addInDB(data, callback) {
     DBClass.insert(
       {
@@ -46,7 +87,8 @@ UserController.register = (req, res) => {
           user_type: "U",
           password: bcrypt.hashSync(data.password, 10),
           mobile: data.mobile,
-          picture: req.file !== undefined ? req.file.path : null,
+          // picture: req.file !== undefined ? req.file.path : null,
+          picture: data.imagePath,
         },
       },
       (err, result) => {
@@ -63,7 +105,7 @@ UserController.register = (req, res) => {
     );
   }
 
-  async.waterfall([validateData, addInDB], (err, result) => {
+  async.waterfall([validateData, uploadImage, addInDB], (err, result) => {
     if (!err) {
       res.status(200).json({
         status: "success",

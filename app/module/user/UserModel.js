@@ -66,32 +66,33 @@ module.exports = {
     User.findAll({
       where: data.condition,
       order: [["createdAt", "DESC"]],
-    }).then(function (entries) {
-      //only difference is that you get users list limited to 1
-      //entries[0]
-      cb(null, {
-        status: "success",
-        data: entries,
-      });
     })
-    .catch((err)=>{
-      cb(err, {
-        status: "failed",
-        message: err
+      .then(function (entries) {
+        //only difference is that you get users list limited to 1
+        //entries[0]
+        cb(null, {
+          status: "success",
+          data: entries,
+        });
+      })
+      .catch((err) => {
+        cb(err, {
+          status: "failed",
+          message: err,
+        });
       });
-    });
   },
 
   addUserLog: (data, callback) => {
     db.sync()
-    .then(() => {
-      return UserLog.create(data.dataToInsert).then(() => {
-        callback(null, { status: "success", msg: "User log added" });
+      .then(() => {
+        return UserLog.create(data.dataToInsert).then(() => {
+          callback(null, { status: "success", msg: "User log added" });
+        });
+      })
+      .catch((error) => {
+        callback(error, { msg: "Some error occured in adding the log" });
       });
-    })
-    .catch((error) => {
-      callback(error, { msg: "Some error occured in adding the log" });
-    });
   },
 
   removeUserLog: (userId, cb) => {
@@ -111,7 +112,7 @@ module.exports = {
           cb("Id not found", {
             status: "failed",
             msg: "Id not found",
-            err_type: "unknown_id"
+            err_type: "unknown_id",
           });
         }
       })
@@ -125,32 +126,33 @@ module.exports = {
 
   addUserBusiness: (data, callback) => {
     db.sync()
-    .then(() => {
-      return BusinessUser.create(data.dataToInsert).then(() => {
-        callback(null, { status: "success", msg: "User log added" });
+      .then(() => {
+        return BusinessUser.create(data.dataToInsert).then(() => {
+          callback(null, { status: "success", msg: "User log added" });
+        });
+      })
+      .catch((error) => {
+        callback(error, { msg: "Some error occured in adding the log" });
       });
-    })
-    .catch((error) => {
-      callback(error, { msg: "Some error occured in adding the log" });
-    });
   },
 
   findBusiness: (data, cb) => {
     BusinessUser.findAll({
       where: data.condition,
       order: [["createdAt", "DESC"]],
-    }).then(function (entries) {
-      cb(null, {
-        status: "success",
-        data: entries,
-      });
     })
-    .catch((err)=>{
-      cb(err, {
-        status: "failed",
-        message: err
+      .then(function (entries) {
+        cb(null, {
+          status: "success",
+          data: entries,
+        });
+      })
+      .catch((err) => {
+        cb(err, {
+          status: "failed",
+          message: err,
+        });
       });
-    });
   },
 
   removeUserBusiness: (userId, cb) => {
@@ -170,7 +172,7 @@ module.exports = {
           cb("Id not found", {
             status: "failed",
             msg: "Id not found",
-            err_type: "unknown_id"
+            err_type: "unknown_id",
           });
         }
       })
@@ -180,5 +182,5 @@ module.exports = {
           message: err,
         });
       });
-  },
+  }
 };
