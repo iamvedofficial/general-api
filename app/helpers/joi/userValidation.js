@@ -34,7 +34,8 @@ const editSchema = Joi.object({
     .optional(),
   url: Joi.string().optional(),
   location: Joi.string().min(2).optional(),
-  picture: Joi.string().optional(),
+  // picture: Joi.string().optional(),
+  picture: Joi.string().pattern(new RegExp("^data:([A-Za-z-+\/]+);base64,(.+)$")).optional(),
   // token: Joi.string().required(),
   oldPhotoPath: Joi.string().required()
 });

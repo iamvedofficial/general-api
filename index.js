@@ -4,6 +4,11 @@ const bodyParser = require('body-parser');
 const route = require('./app/module/user/route');
 const businessRoute = require("./app/module/business/route");
 const config = require('./config/config');
+const path = require("path");
+
+app.use(express.static(path.join(__dirname, 'public')));
+
+global.appRoot = path.resolve(__dirname);
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({extended: true}));

@@ -40,41 +40,60 @@ UserController.register = (req, res) => {
     }
   }
 
-  function uploadImage(data, callback){
-    var response = {};
-    const imageBase64 = (data.base64image).trim();
-    const regex = /^data:([A-Za-z-+\/]+);base64,(.+)$/;
-    const found = imageBase64.match(regex);
-    
-    if(found !== null){
-      const extensionType = imageBase64.split(";")[0].split(":")[1];
-      const base64encoded = imageBase64.split(";")[1].split(",")[1];
+  function uploadImage(data, callback) {
+    if(data.base64image){
+      var response = {};
+      const imageBase64 = data.base64image.trim();
+      const regex = /^data:([A-Za-z-+\/]+);base64,(.+)$/;
+      const found = imageBase64.match(regex);
   
-      const buffer = Buffer.from(imageBase64.substring(imageBase64.indexOf(',') + 1), 'base64');
-      let extension = mime.extension(extensionType);
-      if(extension === 'jpeg' || extension === 'jpg' || extension === 'png'){
-        if(buffer.length <= 1024*1024){
-          response.data = new Buffer(base64encoded, "base64");
-          let decodedImg = response;
-          let imageBuffer = decodedImg.data;
-         
-          let fileName = "image_" + Date.now() + "." + extension;
-          try {
-            fs.writeFileSync("public/upload/images/" + fileName, imageBuffer, "utf8");
-            //data.imagePath = 'E:/prog_pract/NodeJS/bitbucket/general-api/public/upload/images/'+fileName;
-            data.imagePath = path.join('E:/prog_pract/NodeJS/bitbucket/general-api/public/upload/images/', fileName);
-            callback(null, data);
-          } catch (e) {
-            callback("error in uploading the image", {status: "failed", msg: "error in uploading the image"});
+      if (found !== null) {
+        const extensionType = imageBase64.split(";")[0].split(":")[1];
+        const base64encoded = imageBase64.split(";")[1].split(",")[1];
+  
+        const buffer = Buffer.from(
+          imageBase64.substring(imageBase64.indexOf(",") + 1),
+          "base64"
+        );
+        let extension = mime.extension(extensionType);
+        if (extension === "jpeg" || extension === "jpg" || extension === "png") {
+          if (buffer.length <= 1024 * 1024) {
+            response.data = new Buffer(base64encoded, "base64");
+            let decodedImg = response;
+            let imageBuffer = decodedImg.data;
+  
+            let fileName = "image_" + Date.now() + "." + extension;
+            try {
+              fs.writeFileSync("public/upload/images/" + fileName, imageBuffer, "utf8");
+  
+              data.imagePath = path.join(appRoot, "public/upload/images/"+fileName);
+              callback(null, data);
+            } catch (e) {
+              callback("error in uploading the image", {
+                status: "failed",
+                msg: "error in uploading the image",
+              });
+            }
+          } else {
+            callback("image size is not valid", {
+              status: "failed",
+              msg: "image size is not valid",
+            });
           }
-        } else {     
-          callback("image size is not valid", {status: 'failed', msg: "image size is not valid"});
+        } else {
+          callback("file is not valid", {
+            status: "failed",
+            msg: "file is not valid",
+          });
         }
       } else {
-       callback("file is not valid",{ status: "failed", msg: "file is not valid" });
+        callback("image base64 is not valid", {
+          status: "failed",
+          msg: "image base64 is not valid",
+        });
       }
     } else {
-      callback("image base64 is not valid",{ status: "failed", msg: "image base64 is not valid" });
+      callback("Image required to complete the registration",{status: "failed", msg: "Image required to complete the registration"});
     }
   }
 
@@ -88,7 +107,7 @@ UserController.register = (req, res) => {
           password: bcrypt.hashSync(data.password, 10),
           mobile: data.mobile,
           // picture: req.file !== undefined ? req.file.path : null,
-          picture: data.imagePath,
+          picture: data.imagePath !== undefined ? data.imagePath : null,
         },
       },
       (err, result) => {
@@ -133,7 +152,6 @@ UserController.register = (req, res) => {
     }
   });
 };
-
 
 /*
  * login user
@@ -615,6 +633,60 @@ UserController.updateUserDetails = (req, res) => {
     );
   }
 
+  function uploadImage(data, callback) {
+
+    var response = {};
+    const imageBase64 = data.picture.trim();
+    const regex = /^data:([A-Za-z-+\/]+);base64,(.+)$/;
+    const found = imageBase64.match(regex);
+
+    if (found !== null) {
+      const extensionType = imageBase64.split(";")[0].split(":")[1];
+      const base64encoded = imageBase64.split(";")[1].split(",")[1];
+
+      const buffer = Buffer.from(
+        imageBase64.substring(imageBase64.indexOf(",") + 1),
+        "base64"
+      );
+      let extension = mime.extension(extensionType);
+      if (extension === "jpeg" || extension === "jpg" || extension === "png") {
+        if (buffer.length <= 1024 * 1024) {
+          response.data = new Buffer(base64encoded, "base64");
+          let decodedImg = response;
+          let imageBuffer = decodedImg.data;
+
+          let fileName = "image_" + Date.now() + "." + extension;
+          try {
+            fs.writeFileSync("public/upload/images/" + fileName, imageBuffer, "utf8");
+
+            data.imagePath = path.join(appRoot, "public/upload/images/"+fileName);
+            callback(null, data);
+          } catch (e) {
+            callback("error in uploading the image", {
+              status: "failed",
+              msg: "error in uploading the image",
+            });
+          }
+        } else {
+          callback("image size is not valid", {
+            status: "failed",
+            msg: "image size is not valid",
+          });
+        }
+      } else {
+        callback("file is not valid", {
+          status: "failed",
+          msg: "file is not valid",
+        });
+      }
+    } else {
+      callback("image base64 is not valid", {
+        status: "failed",
+        msg: "image base64 is not valid",
+      });
+    }
+  }
+
   function modifyUserDetails(passedData, callback) {
     try {
       let decoded = jwt.verify(token, config.TOKEN_GENERATION);
@@ -624,8 +696,8 @@ UserController.updateUserDetails = (req, res) => {
           values[key] = value;
         }
       }
-      if (req.file !== undefined) {
-        values["picture"] = req.file.path;
+      if (passedData.picture !== undefined) {
+        values["picture"] = passedData.imagePath;
       } else {
         callback("Image required, Please add the picture.", {
           msg: "Image required, Please add the picture.",
@@ -660,7 +732,7 @@ UserController.updateUserDetails = (req, res) => {
   }
 
   async.waterfall(
-    [validateToken, validateEdit, isAdmin, modifyUserDetails],
+    [validateToken, validateEdit, isAdmin, uploadImage, modifyUserDetails],
     (err, result) => {
       if (!err) {
         res.status(200).json({
@@ -668,17 +740,10 @@ UserController.updateUserDetails = (req, res) => {
           msg: " user data modified succesfully.",
         });
       } else {
-        Helpers.deleteFileFromTheFolder(
-          {
-            path: req.file.path,
-          },
-          (error, result) => {
-            res.json({
-              status: "failed",
-              err: err,
-            });
-          }
-        );
+        res.json({
+          status: "failed",
+          err: err,
+        });
       }
     }
   );
